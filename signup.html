@@ -5,9 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>إنشاء حساب</title>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <!-- reCAPTCHA v3 -->
   <script src="https://www.google.com/recaptcha/api.js?render=6LdxBKErAAAAAFVlC71oXUICVYSgzNeDFEyxQ7fJ"></script>
-
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     body { font-family: 'Nunito', sans-serif; background: linear-gradient(135deg,#0a1b2a 0%,#112f4a 100%); color:#e0e6f0; min-height:100vh; display:flex; justify-content:center; align-items:center; padding:1.5rem; }
@@ -34,8 +32,8 @@
   <h1>إنشاء حساب جديد</h1>
   <p class="subtitle">انضم إلينا الآن وابدأ رحلتك</p>
 
-  <!-- NOTE: replace the email address below with your real email -->
-  <form id="signupForm" action="https://formsubmit.co/yacob13579@email.com" method="POST" class="signup-form" onsubmit="return onSubmitPrepare(event);">
+  <!-- action kept as non-navigating fallback; we will submit via fetch to the AJAX endpoint -->
+  <form id="signupForm" action="javascript:void(0)" method="POST" class="signup-form" onsubmit="return onSubmitPrepare(event);">
 
     <div class="form-group">
       <label for="username">اسم المستخدم</label>
@@ -63,14 +61,12 @@
       <input type="text" id="website" name="website" autocomplete="off" tabindex="-1" />
     </div>
 
-    <!-- Hidden input to hold recaptcha token -->
+    <!-- Hidden fields -->
     <input type="hidden" id="recaptchaToken" name="recaptcha_token" />
 
-    <!-- Formsubmit redirect target: we'll set to absolute URL before submit -->
-    <input type="hidden" name="_next" value="">
-
-    <!-- optional subject for the email you receive -->
-    <input type="hidden" name="_subject" value="Signup from site (demo)">
+    <!-- Optional: try to request that FormSubmit uses the submitter as reply-to (helps replies to go to the user).
+         This doesn't guarantee FormSubmit will send an autoresponse to the user — see notes below. -->
+    <input type="hidden" name="_replyto" id="_replyto" value="">
 
     <button type="submit" class="signup-btn">تسجيل</button>
     <p class="login-link">لديك حساب بالفعل؟ <a href="login.html">تسجيل الدخول</a></p>
@@ -80,101 +76,129 @@
 <div id="cg-toast" role="status" aria-live="polite"></div>
 
 <script>
- (function(){
-    const form = document.getElementById('signupForm');
-    const toast = document.getElementById('cg-toast');
-    const submitBtn = form.querySelector('.signup-btn');
+(async function(){
+  const FORM_EMAIL = 'yacob13579@email.com'; // <<< REPLACE this with the email you registered at FormSubmit
+  const AJAX_ENDPOINT = `https://formsubmit.co/ajax/${encodeURIComponent(FORM_EMAIL)}`;
 
-    function showToast(msg, ms = 2600) {
-      toast.textContent = msg;
-      toast.style.opacity = '1';
-      setTimeout(() => { toast.style.opacity = '0'; }, ms);
+  const form = document.getElementById('signupForm');
+  const toast = document.getElementById('cg-toast');
+  const submitBtn = form.querySelector('.signup-btn');
+
+  function showToast(msg, ms = 2600) {
+    toast.textContent = msg;
+    toast.style.opacity = '1';
+    setTimeout(() => { toast.style.opacity = '0'; }, ms);
+  }
+
+  function bufferToHex(buffer) {
+    const bytes = new Uint8Array(buffer);
+    return Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join('');
+  }
+
+  function emailValid(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
+
+  function setSubmitting(state) {
+    submitBtn.disabled = state;
+    submitBtn.style.opacity = state ? '0.7' : '1';
+    if (state) {
+      submitBtn.dataset.origText = submitBtn.textContent;
+      submitBtn.textContent = 'جارٍ الإرسال...';
+    } else {
+      submitBtn.textContent = submitBtn.dataset.origText || submitBtn.textContent;
+    }
+  }
+
+  window.onSubmitPrepare = async function(e) {
+    e.preventDefault();
+
+    const username = document.getElementById('username').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const passwordEl = document.getElementById('password');
+    const confirmEl = document.getElementById('confirm-password');
+    const password = passwordEl.value || '';
+    const confirm = confirmEl.value || '';
+    const honeypot = document.getElementById('website').value;
+
+    if (honeypot) { showToast('Spam detected.'); return false; }
+    if (!username || username.length < 2) { showToast('Please enter a valid username.'); document.getElementById('username').focus(); return false; }
+    if (!email || !emailValid(email)) { showToast('Please enter a valid email.'); document.getElementById('email').focus(); return false; }
+    if (!password || password.length < 6) { showToast('Password must be at least 6 characters.'); passwordEl.focus(); return false; }
+    if (password !== confirm) { showToast('Passwords do not match.'); confirmEl.focus(); return false; }
+
+    setSubmitting(true);
+
+    // Hash password (optional)
+    try {
+      const enc = new TextEncoder().encode(password);
+      const digest = await crypto.subtle.digest('SHA-256', enc);
+      const hexHash = bufferToHex(digest);
+      passwordEl.value = hexHash;
+      confirmEl.value = '';
+    } catch (err) {
+      console.warn('Hashing failed, will send plain password (not recommended).', err);
     }
 
-    function bufferToHex(buffer) {
-      const bytes = new Uint8Array(buffer);
-      return Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join('');
-    }
-
-    function emailValid(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
-
-    function setSubmitting(state) {
-      submitBtn.disabled = state;
-      submitBtn.style.opacity = state ? '0.7' : '1';
-      if (state) {
-        submitBtn.dataset.origText = submitBtn.textContent;
-        submitBtn.textContent = 'جارٍ الإرسال...';
-      } else {
-        submitBtn.textContent = submitBtn.dataset.origText || submitBtn.textContent;
+    // reCAPTCHA v3 token (if you want)
+    if (window.grecaptcha && grecaptcha.execute) {
+      try {
+        const token = await new Promise((resolve, reject) => {
+          grecaptcha.ready(() => {
+            grecaptcha.execute('6LdxBKErAAAAAFVlC71oXUICVYSgzNeDFEyxQ7fJ', { action: 'signup' })
+              .then(resolve).catch(reject);
+          });
+        });
+        document.getElementById('recaptchaToken').value = token;
+      } catch (rcErr) {
+        console.warn('reCAPTCHA failed:', rcErr);
+        // allow submission to proceed if you prefer; remove the following line if you don't want to block on recaptcha
+        // setSubmitting(false); showToast('reCAPTCHA failed.'); return false;
       }
     }
 
-    window.onSubmitPrepare = async function(e) {
-      e.preventDefault();
+    // Build FormData for AJAX send
+    const fd = new FormData(form);
+    // Set _replyto to the user's email so replies go to them (helps with reply headers).
+    const replyInput = document.getElementById('_replyto');
+    if (replyInput) replyInput.value = email;
 
-      const username = document.getElementById('username').value.trim();
-      const email = document.getElementById('email').value.trim();
-      const passwordEl = document.getElementById('password');
-      const confirmEl = document.getElementById('confirm-password');
-      const password = passwordEl.value || '';
-      const confirm = confirmEl.value || '';
-      const honeypot = document.getElementById('website').value;
+    // IMPORTANT: submit via FormSubmit AJAX endpoint so the user stays on your page
+    try {
+      const res = await fetch(AJAX_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Accept': 'application/json' },
+        body: fd
+      });
 
-      if (honeypot) {
-        showToast('Spam detected.');
+      // FormSubmit's AJAX returns JSON when Accept: application/json
+      if (!res.ok) {
+        const text = await res.text().catch(()=>null);
+        console.error('FormSubmit returned non-OK:', res.status, text);
+        showToast('فشل الإرسال — حاول مرة أخرى.');
+        setSubmitting(false);
         return false;
       }
 
-      if (!username || username.length < 2) { showToast('Please enter a valid username.'); document.getElementById('username').focus(); return false; }
-      if (!email || !emailValid(email)) { showToast('Please enter a valid email.'); document.getElementById('email').focus(); return false; }
-      if (!password || password.length < 6) { showToast('Password must be at least 6 characters.'); passwordEl.focus(); return false; }
-      if (password !== confirm) { showToast('Passwords do not match.'); confirmEl.focus(); return false; }
+      const json = await res.json().catch(()=>null);
+      console.log('FormSubmit response:', json);
 
-      setSubmitting(true);
+      // --- At this point the submission succeeded to FormSubmit ---
+      // Redirect user to login.html
+      showToast('تم إنشاء الحساب — سيتم إعادة التوجيه...', 1200);
+      setTimeout(()=> {
+        window.location.href = window.location.origin + '/login.html';
+      }, 900);
 
-      try {
-        // Hash password before sending (client-side SHA-256)
-        const enc = new TextEncoder().encode(password);
-        const digest = await crypto.subtle.digest('SHA-256', enc);
-        const hexHash = bufferToHex(digest);
-        passwordEl.value = hexHash;
-        confirmEl.value = '';
-      } catch (err) {
-        console.warn('Hashing failed, sending plain password (not recommended):', err);
-      }
-
-      // Ensure _next is an absolute URL (Formsubmit prefers full URL)
-      let nextInput = form.querySelector('input[name="_next"]');
-      if (!nextInput) {
-        nextInput = document.createElement('input');
-        nextInput.type = 'hidden';
-        nextInput.name = '_next';
-        form.appendChild(nextInput);
-      }
-      nextInput.value = window.location.origin + '/login.html';
-
-      // Execute reCAPTCHA v3 for "signup" action then submit
-      if (window.grecaptcha && grecaptcha.execute) {
-        grecaptcha.ready(function() {
-          grecaptcha.execute('6LdxBKErAAAAAFVlC71oXUICVYSgzNeDFEyxQ7fJ', {action: 'signup'}).then(function(token) {
-            document.getElementById('recaptchaToken').value = token;
-            // submit to Formsubmit.co; on success it will redirect to _next (login.html)
-            form.submit();
-          }).catch(function(err){
-            console.error('reCAPTCHA error', err);
-            setSubmitting(false);
-            showToast('reCAPTCHA failed. Please try again.');
-          });
-        });
-      } else {
-        // grecaptcha not available: submit without token (not ideal)
-        console.warn('grecaptcha not available, submitting without token.');
-        form.submit();
-      }
-
+      // OPTIONAL: you can perform other client-side actions here (local storage, analytics, etc.)
       return false;
-    };
-  })();
+
+    } catch (err) {
+      console.error('AJAX submission failed:', err);
+      showToast('فشل الاتصال — تحقق من اتصالك وحاول مرة أخرى.');
+      setSubmitting(false);
+      return false;
+    }
+  };
+})();
 </script>
 
 </body>
