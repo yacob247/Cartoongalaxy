@@ -4,8 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>إنشاء حساب</title>
-  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+ <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Load reCAPTCHA v3 script with your site key -->
+  <script src="https://www.google.com/recaptcha/api.js?render=6LdxBKErAAAAAFVlC71oXUICVYSgzNeDFEyxQ7fJ"></script>
   <style>
+    <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Nunito', sans-serif; background: linear-gradient(135deg, #0a1b2a 0%, #112f4a 100%); color: #e0e6f0; min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 1.5rem; }
     .signup-container { background: rgba(20, 45, 75, 0.95); padding: 2rem 2.5rem; border-radius: 15px; box-shadow: 0 0 25px rgba(255, 59, 59, 0.4), inset 0 0 10px rgba(255, 59, 59, 0.2); width: 100%; max-width: 420px; text-align: center; }
@@ -21,170 +25,137 @@
     .login-link a { color: #ff3b3b; font-weight: 700; text-decoration: none; }
     .login-link a:hover { color: #ff6666; text-shadow: 0 0 6px #ff6666; }
     #cg-toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 20px; background: #222; color: #fff; padding: 0.6rem 0.9rem; border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,0.5); opacity: 0; transition: opacity .2s; z-index: 99999; pointer-events: none; }
-    .status { margin-top: 0.9rem; font-weight: 700; display:none; }
-    .status.ok { color: #bff7c7; } .status.err { color: #ffb6b6; }
     @media (max-width:480px) { .signup-container{ padding:1.3rem; } }
+  
+    /* ... your existing CSS ... */
+
   </style>
+
+  <!-- Load Google reCAPTCHA script -->
 </head>
 <body>
 
-  <div class="signup-container">
-    <h1>إنشاء حساب جديد</h1>
-    <p class="subtitle">انضم إلينا الآن وابدأ رحلتك</p>
+<div class="signup-container">
+  <h1>إنشاء حساب جديد</h1>
+  <p class="subtitle">انضم إلينا الآن وابدأ رحلتك</p>
 
-    <!-- IMPORTANT: action targets your Apps Script web app URL -->
-    <form
-      id="signupForm"
-      action="https://script.google.com/macros/s/AKfycbxnN0u5vk3WDhF44EjQGUgel2MSo19Xjy-SfUtyCEpakUswiUmAjK4fKG4PERM7gmbSrg/exec"
-      method="POST"
-      class="signup-form"
-      target="hidden_iframe"
-      onsubmit="return onSubmitPrepare(event);"
-    >
-      <div class="form-group">
-        <label for="username">اسم المستخدم</label>
-        <!-- keep the same name used by your Apps Script (or Google Form entry keys) -->
-        <input type="text" id="username" name="entry.342209693" placeholder="أدخل اسم المستخدم" required>
-      </div>
+  <form id="signupForm" action="https://formspree.io/f/YOUR_FORM_ID" method="POST" class="signup-form" onsubmit="return onSubmitPrepare(event);">
 
-      <div class="form-group">
-        <label for="email">البريد الإلكتروني</label>
-        <input type="email" id="email" name="entry.123456789" placeholder="example@email.com" required>
-      </div>
+    <!-- Your form inputs here -->
+    <div class="form-group">
+      <label for="username">اسم المستخدم</label>
+      <input type="text" id="username" name="username" placeholder="أدخل اسم المستخدم" required>
+    </div>
 
-      <div class="form-group">
-        <label for="password">كلمة المرور</label>
-        <input type="password" id="password" name="entry.987654321" placeholder="••••••••" required>
-      </div>
+    <div class="form-group">
+      <label for="email">البريد الإلكتروني</label>
+      <input type="email" id="email" name="email" placeholder="example@email.com" required>
+    </div>
 
-      <div class="form-group">
-        <label for="confirm-password">تأكيد كلمة المرور</label>
-        <!-- no name attribute so it won't be sent -->
-        <input type="password" id="confirm-password" placeholder="••••••••" required>
-      </div>
+    <div class="form-group">
+      <label for="password">كلمة المرور</label>
+      <input type="password" id="password" name="password" placeholder="••••••••" required>
+    </div>
 
-      <input type="hidden" name="_subject" value="Signup from site (demo)">
-      <input type="hidden" name="page" value="signup">
+    <div class="form-group">
+      <label for="confirm-password">تأكيد كلمة المرور</label>
+      <input type="password" id="confirm-password" placeholder="••••••••" required>
+    </div>
 
-      <button type="submit" class="signup-btn">تسجيل</button>
+    <!-- Honeypot hidden input -->
+    <div style="position:absolute; left:-9999px; top:auto; width:1px; height:1px; overflow:hidden;">
+      <label for="website">Website (leave blank)</label>
+      <input type="text" id="website" name="website" autocomplete="off" tabindex="-1" />
+    </div>
 
-      <p class="login-link">لديك حساب بالفعل؟ <a href="login.html">تسجيل الدخول</a></p>
-    </form>
+    <!-- Hidden input to hold recaptcha token -->
+    <input type="hidden" id="recaptchaToken" name="recaptcha_token" />
 
-  </div>
+    <input type="hidden" name="_subject" value="Signup from site (demo)">
 
-  <!-- hidden iframe receives the Apps Script response -->
-  <iframe name="hidden_iframe" id="hidden_iframe" style="display:none;"></iframe>
+    <button type="submit" class="signup-btn">تسجيل</button>
+    <p class="login-link">لديك حساب بالفعل؟ <a href="login.html">تسجيل الدخول</a></p>
+  </form>
+</div>
 
-  <!-- accessible toast -->
-  <div id="cg-toast" role="status" aria-live="polite"></div>
+<div id="cg-toast" role="status" aria-live="polite"></div>
 
 <script>
-/* Full client-side JS:
-   - validates fields
-   - hashes password (SHA-256)
-   - submits to your Apps Script web app in a hidden iframe
-   - listens for postMessage from the iframe (Apps Script response.html posts {status:'ok'} or {status:'error', message:...})
-*/
+ (function(){
+    const form = document.getElementById('signupForm');
+    const toast = document.getElementById('cg-toast');
+    const submitBtn = form.querySelector('.signup-btn');
 
-(function(){
-  const form = document.getElementById('signupForm');
-  const toast = document.getElementById('cg-toast');
-  const submitBtn = form.querySelector('.signup-btn');
-  const iframe = document.getElementById('hidden_iframe');
+    function showToast(msg, ms = 2600) {
+      toast.textContent = msg;
+      toast.style.opacity = '1';
+      setTimeout(() => { toast.style.opacity = '0'; }, ms);
+    }
 
-  // toast helper
-  let toastTimer = null;
-  function showToast(msg, ms = 2600) {
-    if (toastTimer) clearTimeout(toastTimer);
-    toast.textContent = msg;
-    toast.style.opacity = '1';
-    toastTimer = setTimeout(()=> { toast.style.opacity = '0'; }, ms);
-  }
+    function bufferToHex(buffer) {
+      const bytes = new Uint8Array(buffer);
+      return Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join('');
+    }
 
-  // convert ArrayBuffer to hex string
-  function bufferToHex(buffer) {
-    const bytes = new Uint8Array(buffer);
-    return Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join('');
-  }
+    function emailValid(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
 
-  // simple email regex
-  function emailValid(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
-
-  // disable/enable submit button
-  function setSubmitting(state) {
-    submitBtn.disabled = state;
-    submitBtn.style.opacity = state ? '0.7' : '1';
-    if (state) { submitBtn.dataset.origText = submitBtn.textContent; submitBtn.textContent = 'جارٍ الإرسال...'; }
-    else { submitBtn.textContent = submitBtn.dataset.origText || submitBtn.textContent; }
-  }
-
-  // Listen for postMessage from Apps Script response (response.html should postMessage)
-  window.addEventListener('message', function(ev){
-    // For safety, optionally check origin
-    // Allowed origin for Apps Script web app responses: script.google.com
-    try {
-      const origin = ev.origin || '';
-      if (!origin.includes('script.google.com')) {
-        // ignore other origins
-        return;
-      }
-      const data = ev.data || {};
-      if (data && data.status === 'ok') {
-        setSubmitting(false);
-        showToast('تم التسجيل بنجاح. Redirecting…');
-        setTimeout(()=> { window.location.href = 'login.html'; }, 900);
+    function setSubmitting(state) {
+      submitBtn.disabled = state;
+      submitBtn.style.opacity = state ? '0.7' : '1';
+      if (state) {
+        submitBtn.dataset.origText = submitBtn.textContent;
+        submitBtn.textContent = 'جارٍ الإرسال...';
       } else {
-        setSubmitting(false);
-        const message = data && data.message ? data.message : 'Submission failed. Try again later.';
-        showToast('خطأ: ' + message);
-        console.warn('Apps Script error:', data);
+        submitBtn.textContent = submitBtn.dataset.origText || submitBtn.textContent;
       }
-    } catch (err) {
-      // fallback handling
-      setSubmitting(false);
-      console.warn('message event handling error', err);
-    }
-  }, false);
-
-  // prepare and submit
-  window.onSubmitPrepare = async function(e) {
-    e.preventDefault();
-
-    const username = document.getElementById('username').value.trim();
-    const email = document.getElementById('email').value.trim();
-    const passwordEl = document.getElementById('password');
-    const confirmEl = document.getElementById('confirm-password');
-    const password = passwordEl.value || '';
-    const confirm = confirmEl.value || '';
-
-    if (!username || username.length < 2) { showToast('Please enter a valid username.'); document.getElementById('username').focus(); return false; }
-    if (!email || !emailValid(email)) { showToast('Please enter a valid email.'); document.getElementById('email').focus(); return false; }
-    if (!password || password.length < 6) { showToast('Password must be at least 6 characters.'); passwordEl.focus(); return false; }
-    if (password !== confirm) { showToast('Passwords do not match.'); confirmEl.focus(); return false; }
-
-    setSubmitting(true);
-
-    // Hash the password (SHA-256) and put the hex into the password field so the server receives the hash
-    try {
-      const enc = new TextEncoder().encode(password);
-      const digest = await crypto.subtle.digest('SHA-256', enc);
-      const hexHash = bufferToHex(digest);
-      passwordEl.value = hexHash;
-      // ensure confirm field is not sent
-      confirmEl.value = '';
-    } catch (err) {
-      console.warn('Hashing failed, sending plain password (not recommended):', err);
-      // fallback: plain password will be sent (not recommended)
     }
 
-    // Submit into hidden iframe. The Apps Script response.html should postMessage back to parent.
-    form.submit();
-    showToast('Sending…');
-    return false;
-  };
+    window.onSubmitPrepare = async function(e) {
+      e.preventDefault();
 
-})();
+      const username = document.getElementById('username').value.trim();
+      const email = document.getElementById('email').value.trim();
+      const passwordEl = document.getElementById('password');
+      const confirmEl = document.getElementById('confirm-password');
+      const password = passwordEl.value || '';
+      const confirm = confirmEl.value || '';
+      const honeypot = document.getElementById('website').value;
+
+      if (honeypot) {
+        showToast('Spam detected.');
+        return false;
+      }
+
+      if (!username || username.length < 2) { showToast('Please enter a valid username.'); document.getElementById('username').focus(); return false; }
+      if (!email || !emailValid(email)) { showToast('Please enter a valid email.'); document.getElementById('email').focus(); return false; }
+      if (!password || password.length < 6) { showToast('Password must be at least 6 characters.'); passwordEl.focus(); return false; }
+      if (password !== confirm) { showToast('Passwords do not match.'); confirmEl.focus(); return false; }
+
+      setSubmitting(true);
+
+      try {
+        // Hash password
+        const enc = new TextEncoder().encode(password);
+        const digest = await crypto.subtle.digest('SHA-256', enc);
+        const hexHash = bufferToHex(digest);
+        passwordEl.value = hexHash;
+        confirmEl.value = '';
+      } catch (err) {
+        console.warn('Hashing failed, sending plain password (not recommended):', err);
+      }
+
+      // Execute reCAPTCHA v3 for "signup" action
+      grecaptcha.ready(function() {
+        grecaptcha.execute('6LdxBKErAAAAAFVlC71oXUICVYSgzNeDFEyxQ7fJ', {action: 'signup'}).then(function(token) {
+          document.getElementById('recaptchaToken').value = token;
+          form.submit();
+        });
+      });
+
+      return false;
+    };
+  })();
 </script>
+
 </body>
 </html>
