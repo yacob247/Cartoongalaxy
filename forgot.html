@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>نسيت كلمة المرور</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://www.google.com/recaptcha/api.js?render=6LdxBKErAAAAAFVlC71oXUICVYSgzNeDFEyxQ7fJ" async></script>
+  <style>
+    html,body { overflow-x: hidden; height: 100%; }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      font-family: 'Nunito', sans-serif;
+      background: linear-gradient(135deg,#0a1b2a 0%,#112f4a 100%);
+      color:#e0e6f0;
+      min-height:100vh;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      padding:1.5rem;
+    }
+    .card{
+      background: rgba(20,45,75,0.95);
+      padding:2rem 2.5rem;
+      border-radius:15px;
+      box-shadow:0 0 25px rgba(0,0,0,0.4);
+      width:100%;
+      max-width:480px;
+      text-align:center;
+      overflow:hidden;
+    }
+    h1{ color:#ff3b3b; font-size:1.9rem; font-weight:800; text-shadow:0 0 8px #ff3b3b; margin-bottom:.5rem }
+    .subtitle{ font-size:1rem; color:#d1d9efcc; margin-bottom:1.2rem }
+    .form-group{ margin-bottom:1rem; text-align:right }
+    label{ display:block; margin-bottom:.4rem; font-weight:700; color:#ffdede }
+    input[type="email"]{
+      width:100%;
+      padding:.6rem .8rem;
+      border-radius:8px;
+      border:none;
+      background:rgba(255,255,255,0.08);
+      color:#fff;
+      font-size:1rem;
+      outline:none;
+      box-shadow:inset 0 0 5px rgba(0,0,0,0.2);
+    }
+    .btn{
+      width:100%;
+      padding:.75rem;
+      font-size:1.05rem;
+      font-weight:800;
+      background:#ff3b3b;
+      color:#fff;
+      border:none;
+      border-radius:8px;
+      cursor:pointer;
+    }
+    .small{ font-size:.95rem; color:#d1d9efcc; margin-top:1rem }
+    #toast{ position:fixed; left:50%; transform:translateX(-50%); bottom:20px; background:#222; color:#fff; padding:.6rem .9rem; border-radius:8px; box-shadow:0 6px 18px rgba(0,0,0,.5); opacity:0; transition:opacity .2s; z-index:99999; pointer-events:none; }
+    @media (max-width:480px){ .card{ padding:1.3rem } }
+  </style>
+</head>
+<body>
+  <main class="card" role="main" aria-labelledby="forgotTitle">
+    <h1 id="forgotTitle">نسيت كلمة المرور</h1>
+    <p class="subtitle">ادخل بريدك الإلكتروني وسنرسل لك رابطًا لإعادة تعيين كلمة المرور (تجريبي)</p>
+
+    <form id="forgotForm" action="javascript:void(0)" method="POST" autocomplete="on" novalidate>
+      <div class="form-group">
+        <label for="email">البريد الإلكتروني</label>
+        <input id="email" name="email" type="email" placeholder="example@email.com" required autocomplete="email" />
+      </div>
+
+      <input type="hidden" id="recaptchaToken" name="recaptcha_token" />
+      <button class="btn" id="sendBtn" type="submit">إرسال رابط إعادة التعيين</button>
+
+      <p class="small">تذكرت كلمة المرور؟ <a href="login.html" style="color:#ff3b3b;font-weight:700;text-decoration:none">تسجيل الدخول</a></p>
+    </form>
+  </main>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+  (function(){
+    const FORM_EMAIL = 'yacob13579@gmail.com';
+    const AJAX_ENDPOINT = `https://formsubmit.co/ajax/${encodeURIComponent(FORM_EMAIL)}`;
+
+    const form = document.getElementById('forgotForm');
+    const toast = document.getElementById('toast');
+    const sendBtn = document.getElementById('sendBtn');
+    const rcInput = document.getElementById('recaptchaToken');
+    const params = new URLSearchParams(location.search);
+  const prefill = params.get('email');
+  if (prefill) {
+    const emailInput = document.getElementById('email');
+    if (emailInput) emailInput.value = prefill;
+  }
+  
+
+    function showToast(msg, ms = 2600) {
+      toast.textContent = msg;
+      toast.style.opacity = '1';
+      setTimeout(()=> toast.style.opacity = '0', ms);
+    }
+
+    function hexFromBuffer(buf) {
+      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+    }
+
+    function randomHex(bytes = 16) {
+      const arr = new Uint8Array(bytes);
+      crypto.getRandomValues(arr);
+      return Array.from(arr).map(b => b.toString(16).padStart(2,'0')).join('');
+    }
+
+    function setSending(state){
+      sendBtn.disabled = state;
+      if (state) sendBtn.dataset.orig = sendBtn.textContent, sendBtn.textContent = 'جارٍ الإرسال...';
+      else sendBtn.textContent = sendBtn.dataset.orig || 'إرسال رابط إعادة التعيين';
+    }
+
+    // Save reset token mapping (demo only) in localStorage.resetTokens as {
+    //   "user@example.com": { token: "abc", expires: 1690000000000 }
+    // }
+    function saveResetToken(email, token, ttlMs = 15*60*1000){
+      const raw = localStorage.getItem('resetTokens') || '{}';
+      const obj = JSON.parse(raw);
+      obj[email] = { token, expires: Date.now() + ttlMs };
+      localStorage.setItem('resetTokens', JSON.stringify(obj));
+    }
+
+    form.addEventListener('submit', async function(ev){
+      ev.preventDefault();
+      setSending(true);
+
+      const email = document.getElementById('email').value.trim().toLowerCase();
+      if (!email) { showToast('أدخل بريدًا إلكترونيًا صالحًا'); setSending(false); return; }
+
+      // compute if user exists locally (demo)
+      const raw = localStorage.getItem('registeredUsers') || '[]';
+      const users = JSON.parse(raw);
+      const exists = users.find(u => u.email === email);
+
+      // Always show same message for privacy reasons
+      showToast('إن طلب إعادة التعيين قيد المعالجة — إن كان الحساب موجودًا فستصلك رسالة.');
+
+      // If account exists locally, create token and store it (demo)
+      let token = null;
+      if (exists) {
+        token = randomHex(18);
+        saveResetToken(email, token, 15*60*1000); // 15 minutes
+      }
+
+      // Attempt reCAPTCHA (non-blocking)
+      try {
+        if (window.grecaptcha && grecaptcha.execute) {
+          const rc = await new Promise((res, rej) => {
+            grecaptcha.ready(() => {
+              grecaptcha.execute('6LdxBKErAAAAAFVlC71oXUICVYSgzNeDFEyxQ7fJ', { action: 'forgot' }).then(res).catch(rej);
+            });
+          });
+          if (rc && rcInput) rcInput.value = rc;
+        }
+      } catch(rcErr){ console.warn('reCAPTCHA failed', rcErr); }
+
+      // Build FormData for FormSubmit: owner receives the reset link (demo)
+      const fd = new FormData();
+      fd.append('email', email);
+      fd.append('_subject', 'Password reset request');
+      fd.append('_replyto', email);
+
+      // Provide a reset link only if token was created. If token is null we still send a generic notice.
+     // build a base URL that works for http(s) and file:// testing
+const getBase = () => {
+  // 1) prefer origin when it's useful (http/https)
+  if (location.origin && location.origin !== 'null') {
+    // keep the path to the current directory
+    return location.origin + location.pathname.replace(/\/[^/]*$/, '/');
+  }
+  // 2) fallback: use full href and strip query/hash and filename
+  return location.href.split(/[?#]/)[0].replace(/\/[^/]*$/, '/');
+};
+
+const base = getBase();
+const resetLink = token
+  ? `${base}reset.html?email=${encodeURIComponent(email)}&token=${encodeURIComponent(token)}`
+  : 'No local account found (demo)';
+fd.append('reset_link', resetLink);
+
+      // include recaptcha token if present
+      const rcVal = rcInput ? rcInput.value : '';
+      if (rcVal) fd.append('recaptcha_token', rcVal);
+
+      try {
+        const res = await fetch(AJAX_ENDPOINT, { method: 'POST', headers: { Accept: 'application/json' }, body: fd });
+        if (!res.ok) {
+          console.error('FormSubmit failed', res.status);
+          // We silently fail but keep UX consistent
+        }
+      } catch(e) {
+        console.warn('Failed to send FormSubmit', e);
+      }
+
+      // Keep the same UX regardless of whether account exists
+      setTimeout(()=>{ setSending(false); }, 800);
+
+      // Optional: show demo-only inline reset link if running locally and account exists
+      if (exists) {
+        // Show short notice and offer to open link in new tab for demo
+        setTimeout(()=>{
+          if (confirm('حسابك موجود محليًا. فتح رابط إعادة التعيين (تجريبي)؟')){
+            window.open(resetLink, '_blank');
+          }
+        }, 600);
+      }
+    });
+  })();
+  </script>
+</body>
+</html>

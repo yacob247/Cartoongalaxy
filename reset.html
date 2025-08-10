@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>إعادة تعيين كلمة المرور</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    html,body { overflow-x: hidden; height: 100%; }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      font-family: 'Nunito', sans-serif;
+      background: linear-gradient(135deg,#0a1b2a 0%,#112f4a 100%);
+      color:#e0e6f0;
+      min-height:100vh;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      padding:1.5rem;
+    }
+    .card{
+      background: rgba(20,45,75,0.95);
+      padding:2rem 2.5rem;
+      border-radius:15px;
+      box-shadow:0 0 25px rgba(0,0,0,0.4);
+      width:100%;
+      max-width:480px;
+      text-align:center;
+      overflow:hidden;
+    }
+    h1{ color:#ff3b3b; font-size:1.9rem; font-weight:800; text-shadow:0 0 8px #ff3b3b; margin-bottom:.5rem }
+    .subtitle{ font-size:1rem; color:#d1d9efcc; margin-bottom:1.2rem }
+    .form-group{ margin-bottom:1rem; text-align:right }
+    label{ display:block; margin-bottom:.4rem; font-weight:700; color:#ffdede }
+    input[type="password"]{
+      width:100%;
+      padding:.6rem .8rem;
+      border-radius:8px;
+      border:none;
+      background:rgba(255,255,255,0.08);
+      color:#fff;
+      font-size:1rem;
+      outline:none;
+      box-shadow:inset 0 0 5px rgba(0,0,0,0.2);
+    }
+    .btn{
+      width:100%;
+      padding:.75rem;
+      font-size:1.05rem;
+      font-weight:800;
+      background:#ff3b3b;
+      color:#fff;
+      border:none;
+      border-radius:8px;
+      cursor:pointer;
+    }
+    .small{ font-size:.95rem; color:#d1d9efcc; margin-top:1rem }
+    #toast{ position:fixed; left:50%; transform:translateX(-50%); bottom:20px; background:#222; color:#fff; padding:.6rem .9rem; border-radius:8px; box-shadow:0 6px 18px rgba(0,0,0,.5); opacity:0; transition:opacity .2s; z-index:99999; pointer-events:none; }
+    .muted{ color:#9fb3d9; font-size:.95rem; margin-bottom:1rem }
+    .linkish{ color:#ff3b3b; font-weight:700; text-decoration:none }
+    @media (max-width:480px){ .card{ padding:1.3rem } }
+  </style>
+</head>
+<body>
+  <main class="card" role="main" aria-labelledby="resetTitle">
+    <h1 id="resetTitle">إعادة تعيين كلمة المرور</h1>
+    <p class="subtitle" id="subtitle">جارٍ التحقق من رابط إعادة التعيين...</p>
+
+    <div id="content">
+      <!-- Content will be injected by JS: either the reset form or an error message -->
+    </div>
+
+    <p class="small">للعودة إلى تسجيل الدخول: <a href="login.html" class="linkish">تسجيل الدخول</a></p>
+  </main>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+  (function(){
+    const toast = document.getElementById('toast');
+    const subtitle = document.getElementById('subtitle');
+    const content = document.getElementById('content');
+
+    function showToast(msg, ms = 2600) {
+      toast.textContent = msg;
+      toast.style.opacity = '1';
+      setTimeout(()=> toast.style.opacity = '0', ms);
+    }
+
+    function hexFromBuffer(buf) {
+      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+    }
+
+    async function sha256Hex(str) {
+      try {
+        const enc = new TextEncoder().encode(str);
+        const digest = await crypto.subtle.digest('SHA-256', enc);
+        return hexFromBuffer(digest);
+      } catch(e) {
+        console.warn('sha256 fallback', e);
+        return btoa(str);
+      }
+    }
+
+    // Helpers to read and write localStorage tokens (demo only)
+    function getResetTokens(){
+      try { return JSON.parse(localStorage.getItem('resetTokens') || '{}'); } catch(e){ return {}; }
+    }
+    function removeResetToken(email){
+      const obj = getResetTokens();
+      if (obj[email]) delete obj[email];
+      localStorage.setItem('resetTokens', JSON.stringify(obj));
+    }
+
+    // read query params
+    const params = new URLSearchParams(location.search);
+    const email = params.get('email');
+    const token = params.get('token');
+
+    if (!email || !token) {
+      subtitle.textContent = 'الرابط غير صالح.';
+      content.innerHTML = `<p class="muted">يبدو أن الرابط الذي استخدمته ناقص أو تالف.</p><p class="muted">اطلب رابط جديدًا من صفحة <a href="forgot-password.html" class="linkish">نسيت كلمة المرور</a>.</p>`;
+      throw new Error('missing params');
+    }
+
+    // validate token
+    const tokens = getResetTokens();
+    const record = tokens[email];
+
+    if (!record || !record.token || record.token !== token || Date.now() > (record.expires || 0)) {
+      subtitle.textContent = 'الرابط منتهي الصلاحية أو غير صالح.';
+      content.innerHTML = `<p class="muted">هذا الرابط غير صالح أو انتهت صلاحيته.</p><p class="muted">اطلب رابطًا جديدًا من <a href="forgot-password.html" class="linkish">نسيت كلمة المرور</a>.</p>`;
+    } else {
+      // show reset form
+      subtitle.textContent = 'ادخل كلمة مرور جديدة.';
+      content.innerHTML = `
+        <form id="resetForm" action="javascript:void(0)" novalidate>
+          <div class="form-group">
+            <label for="password">كلمة المرور الجديدة</label>
+            <input id="password" name="password" type="password" placeholder="••••••••" required autocomplete="new-password" />
+          </div>
+          <div class="form-group">
+            <label for="confirm">تأكيد كلمة المرور</label>
+            <input id="confirm" name="confirm" type="password" placeholder="••••••••" required autocomplete="new-password" />
+          </div>
+          <button class="btn" id="resetBtn" type="submit">تعيين كلمة المرور</button>
+        </form>
+      `;
+
+      // attach handler
+      const resetForm = document.getElementById('resetForm');
+      resetForm.addEventListener('submit', async function(ev){
+        ev.preventDefault();
+        const p = document.getElementById('password').value || '';
+        const c = document.getElementById('confirm').value || '';
+        const resetBtn = document.getElementById('resetBtn');
+
+        if (!p || p.length < 6) { showToast('يجب أن تكون كلمة المرور 6 أحرف على الأقل'); return; }
+        if (p !== c) { showToast('كلمتا المرور غير متطابقتين'); return; }
+
+        resetBtn.disabled = true;
+        resetBtn.textContent = 'جارٍ التعيين...';
+
+        // hash and update registeredUsers
+        const pwHash = await sha256Hex(p);
+        try {
+          const raw = localStorage.getItem('registeredUsers') || '[]';
+          const users = JSON.parse(raw);
+          const idx = users.findIndex(u => u.email === email);
+          if (idx === -1) {
+            showToast('الحساب غير موجود محليًا.');
+            resetBtn.disabled = false;
+            resetBtn.textContent = 'تعيين كلمة المرور';
+            return;
+          }
+          users[idx].passwordHash = pwHash;
+          localStorage.setItem('registeredUsers', JSON.stringify(users));
+
+          // remove reset token
+          removeResetToken(email);
+
+          showToast('تم تعيين كلمة المرور بنجاح — إعادة التوجيه لتسجيل الدخول...', 1600);
+          setTimeout(()=>{
+            const target = `login.html?reset=1&email=${encodeURIComponent(email)}`;
+            window.location.href = target;
+          }, 1000);
+        } catch(e) {
+          console.error('failed to set password', e);
+          showToast('فشل تعيين كلمة المرور. حاول مرة أخرى.');
+          resetBtn.disabled = false;
+          resetBtn.textContent = 'تعيين كلمة المرور';
+        }
+      });
+    }
+
+  })();
+  </script>
+</body>
+</html>
