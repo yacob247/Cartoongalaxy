@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>إنشاء حساب</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+/* Base style from your site (unchanged) */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Nunito', sans-serif; background: linear-gradient(135deg, #0a1b2a 0%, #112f4a 100%); color: #e0e6f0; min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 1.5rem; }
+.signup-container { background: rgba(20, 45, 75, 0.95); padding: 2rem 2.5rem; border-radius: 15px; box-shadow: 0 0 25px rgba(255, 59, 59, 0.4), inset 0 0 10px rgba(255, 59, 59, 0.2); width: 100%; max-width: 420px; text-align: center; }
+.signup-container h1 { color: #ff3b3b; font-size: 2rem; font-weight: 800; text-shadow: 0 0 8px #ff3b3b; margin-bottom: 0.5rem; }
+.subtitle { font-size: 1rem; color: #d1d9efcc; margin-bottom: 1.5rem; }
+.signup-form .form-group { margin-bottom: 1.2rem; text-align: right; }
+.signup-form label { display: block; margin-bottom: 0.4rem; font-weight: 700; color: #ffdede; }
+.signup-form input { width: 100%; padding: 0.6rem 0.8rem; border-radius: 8px; border: none; background: rgba(255, 255, 255, 0.08); color: #fff; font-size: 1rem; outline: none; box-shadow: inset 0 0 5px rgba(255, 59, 59, 0.4); transition: box-shadow 0.3s ease, background 0.3s ease; }
+.signup-form input:focus { background: rgba(255, 255, 255, 0.12); box-shadow: 0 0 8px #ff3b3b, inset 0 0 8px #ff3b3b; }
+.signup-btn { width: 100%; padding: 0.75rem; font-size: 1.1rem; font-weight: 800; background: #ff3b3b; color: white; border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 0 15px #ff3b3baa; transition: background 0.3s ease, box-shadow 0.3s ease; }
+.signup-btn:hover { background: #ff6666; box-shadow: 0 0 25px #ff6666bb; }
+.login-link { margin-top: 1rem; font-size: 0.95rem; }
+.login-link a { color: #ff3b3b; font-weight: 700; text-decoration: none; }
+.login-link a:hover { color: #ff6666; text-shadow: 0 0 6px #ff6666; }
+
+/* small accessible toast */
+#cg-toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 20px; background: #222; color: #fff; padding: 0.6rem 0.9rem; border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,0.5); opacity: 0; transition: opacity .2s; z-index: 99999; pointer-events: none; }
+.status { margin-top: 0.9rem; font-weight: 700; display:none; }
+.status.ok { color: #bff7c7; } .status.err { color: #ffb6b6; }
+@media (max-width:480px) { .signup-container{ padding:1.3rem; } }
+  </style>
+</head>
+<body>
+
+  <div class="signup-container">
+    <h1>إنشاء حساب جديد</h1>
+    <p class="subtitle">انضم إلينا الآن وابدأ رحلتك</p>
+
+    <!-- set action to the Apps Script web app and target hidden iframe -->
+    <!-- Replace WEB_APP_URL_HERE with your deployed Apps Script web app URL -->
+    <form id="signupForm" action="https://docs.google.com/spreadsheets/d/1y7HN535URp_QF_-GZTHN5Eps-OzpnAwYcKaCoKk2Xbg/edit?gid=0#gid=0" method="POST" class="signup-form" target="hidden_iframe" onsubmit="return onSubmitPrepare(event);">
+      <div class="form-group">
+        <label for="username">اسم المستخدم</label>
+        <input type="text" id="username" name="username" placeholder="أدخل اسم المستخدم" required>
+      </div>
+
+      <div class="form-group">
+        <label for="email">البريد الإلكتروني</label>
+        <input type="email" id="email" name="_replyto" placeholder="example@email.com" required>
+      </div>
+
+      <div class="form-group">
+        <label for="password">كلمة المرور</label>
+        <input type="password" id="password" name="password" placeholder="••••••••" required>
+      </div>
+
+      <div class="form-group">
+        <label for="confirm-password">تأكيد كلمة المرور</label>
+        <input type="password" id="confirm-password" name="confirm-password" placeholder="••••••••" required>
+      </div>
+
+      <!-- optional: metadata for the Apps Script (human readable) -->
+      <input type="hidden" name="_subject" value="Signup from site (demo)">
+      <input type="hidden" name="page" value="signup">
+
+      <button type="submit" class="signup-btn">تسجيل</button>
+
+      <p class="login-link">لديك حساب بالفعل؟ <a href="login.html">تسجيل الدخول</a></p>
+    </form>
+  </div>
+
+  <!-- hidden iframe receives the Apps Script response -->
+  <iframe name="hidden_iframe" id="hidden_iframe" style="display:none;"></iframe>
+
+  <!-- accessible toast -->
+  <div id="cg-toast" role="status" aria-live="polite"></div>
+
+<script>
+/*
+  Replacement: submit to Google Sheets via Apps Script Web App.
+  1) Deploy Apps Script with a doPost(e) that appends rows to your sheet (see earlier instructions).
+  2) Paste the Web App URL into FORM_WEBAPP_URL (or set it directly into the form action above).
+  3) This script hashes the password (SHA-256) before sending, clears confirm-password, submits to hidden iframe,
+     and listens for a postMessage from the iframe to show success/failure to the user.
+*/
+
+(function(){
+  const form = document.getElementById('signupForm');
+  const toast = document.getElementById('cg-toast');
+  const submitBtn = form.querySelector('.signup-btn');
+
+  // small toast helper
+  let toastTimer = null;
+  function showToast(msg, ms = 2200) {
+    if (toastTimer) clearTimeout(toastTimer);
+    toast.textContent = msg;
+    toast.style.opacity = '1';
+    toastTimer = setTimeout(()=> { toast.style.opacity = '0'; }, ms);
+  }
+
+  // utility: hex from buffer
+  function bufferToHex(buffer) {
+    const bytes = new Uint8Array(buffer);
+    return Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join('');
+  }
+
+  // form validation helpers
+  function emailValid(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
+
+  // disable/enable submit
+  function setSubmitting(state) {
+    submitBtn.disabled = state;
+    submitBtn.style.opacity = state ? '0.7' : '1';
+    if (state) { submitBtn.dataset.origText = submitBtn.textContent; submitBtn.textContent = 'جارٍ الإرسال...'; }
+    else { submitBtn.textContent = submitBtn.dataset.origText || submitBtn.textContent; }
+  }
+
+  // Listen for postMessage from Apps Script iframe
+  window.addEventListener('message', function(ev){
+    const data = ev.data || {};
+    if (data && data.status === 'ok') {
+      showToast('تم التسجيل بنجاح. إعادة التوجيه…');
+      setSubmitting(false);
+      // redirect or clear fields
+      setTimeout(()=> { window.location.href = 'login.html'; }, 900);
+    } else {
+      setSubmitting(false);
+      showToast('حدث خطأ أثناء التسجيل. حاول لاحقًا.');
+      console.warn('Apps Script response:', data);
+    }
+  }, false);
+
+  // On submit: validate, hash password, clear confirm field, then submit to iframe
+  window.onSubmitPrepare = async function(e) {
+    e.preventDefault();
+
+    const username = document.getElementById('username').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const passwordEl = document.getElementById('password');
+    const confirmEl = document.getElementById('confirm-password');
+    const password = passwordEl.value || '';
+    const confirm = confirmEl.value || '';
+
+    if (!username || username.length < 2) { showToast('الرجاء إدخال اسم مستخدم صحيح.'); document.getElementById('username').focus(); return false; }
+    if (!email || !emailValid(email)) { showToast('الرجاء إدخال بريد إلكتروني صالح.'); document.getElementById('email').focus(); return false; }
+    if (!password || password.length < 6) { showToast('كلمة المرور يجب أن تكون 6 أحرف على الأقل.'); passwordEl.focus(); return false; }
+    if (password !== confirm) { showToast('كلمتا المرور غير متطابقتين.'); confirmEl.focus(); return false; }
+
+    setSubmitting(true);
+
+    // hash the password (SHA-256)
+    try {
+      const enc = new TextEncoder().encode(password);
+      const digest = await crypto.subtle.digest('SHA-256', enc);
+      const hexHash = bufferToHex(digest);
+      // put hash into password field (so the sheet will store the hash)
+      passwordEl.value = hexHash;
+      // remove confirm before submit (don't send)
+      confirmEl.value = '';
+    } catch (err) {
+      console.warn('Hashing failed, sending plain password (not recommended):', err);
+      // if hashing fails we fall back to sending plain password (still not ideal)
+    }
+
+    // submit the form to the hidden iframe (standard POST, works with Apps Script doPost(e))
+    form.submit();
+
+    // show intermediate message
+    showToast('جارٍ الإرسال…');
+    return false;
+  };
+
+})();
+</script>
+</body>
+</html>
