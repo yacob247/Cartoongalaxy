@@ -1,382 +1,244 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>إنشاء حساب</title>
-  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <script src="https://www.google.com/recaptcha/api.js?render=6LdxBKErAAAAAFVlC71oXUICVYSgzNeDFEyxQ7fJ"></script>
-  <style>
-    * { margin:0; padding:0; box-sizing:border-box; }
-    body { font-family: 'Nunito', sans-serif; background: linear-gradient(135deg,#0a1b2a 0%,#112f4a 100%); color:#e0e6f0; min-height:100vh; display:flex; justify-content:center; align-items:center; padding:1.5rem; }
-    .signup-container { background: rgba(20,45,75,0.95); padding:2rem 2.5rem; border-radius:15px; box-shadow:0 0 25px rgba(255,59,59,0.4), inset 0 0 10px rgba(255,59,59,0.2); width:100%; max-width:420px; text-align:center; }
-    .signup-container h1 { color:#ff3b3b; font-size:2rem; font-weight:800; text-shadow:0 0 8px #ff3b3b; margin-bottom:0.5rem; }
-    .subtitle { font-size:1rem; color:#d1d9efcc; margin-bottom:1.5rem; }
-    .signup-form .form-group { margin-bottom:1.2rem; text-align:right; }
-    .signup-form label { display:block; margin-bottom:0.4rem; font-weight:700; color:#ffdede; }
-    .signup-form input { width:100%; padding:0.6rem 0.8rem; border-radius:8px; border:none; background:rgba(255,255,255,0.08); color:#fff; font-size:1rem; outline:none; box-shadow: inset 0 0 5px rgba(255,59,59,0.4); transition: box-shadow 0.3s, background 0.3s; }
-    .signup-form input:focus { background: rgba(255,255,255,0.12); box-shadow: 0 0 8px #ff3b3b, inset 0 0 8px #ff3b3b; }
-    .signup-btn { width:100%; padding:0.75rem; font-size:1.1rem; font-weight:800; background:#ff3b3b; color:white; border:none; border-radius:8px; cursor:pointer; box-shadow:0 0 15px #ff3b3baa; transition: background 0.3s, box-shadow 0.3s; }
-    .signup-btn[disabled] { cursor:not-allowed; opacity:0.7; }
-    .signup-btn:hover { background:#ff6666; box-shadow:0 0 25px #ff6666bb; }
-    .login-link { margin-top:1rem; font-size:0.95rem; }
-    .login-link a { color:#ff3b3b; font-weight:700; text-decoration:none; }
-    .login-link a:hover { color:#ff6666; text-shadow:0 0 6px #ff6666; }
-    #cg-toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 20px; background: #222; color: #fff; padding: 0.6rem 0.9rem; border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,0.5); opacity: 0; transition: opacity .2s; z-index: 99999; pointer-events: none; }
-    @media (max-width:480px) { .signup-container{ padding:1.3rem; } }
-  </style>
-</head>
-<body>
-
-<div class="signup-container">
-  <h1>إنشاء حساب جديد</h1>
-  <p class="subtitle">انضم إلينا الآن وابدأ رحلتك</p>
-
-  <!-- action kept as non-navigating fallback; we will submit via fetch to the AJAX endpoint -->
-  <form id="signupForm" action="javascript:void(0)" method="POST" class="signup-form" onsubmit="return onSubmitPrepare(event);">
-
-    <div class="form-group">
-      <label for="username">اسم المستخدم</label>
-      <input type="text" id="username" name="username" placeholder="أدخل اسم المستخدم" required autocomplete="username">
-    </div>
-
-    <div class="form-group">
-      <label for="email">البريد الإلكتروني</label>
-      <input type="email" id="email" name="email" placeholder="example@email.com" required autocomplete="email">
-    </div>
-
-    <div class="form-group">
-      <label for="password">كلمة المرور</label>
-      <input type="password" id="password" name="password" placeholder="••••••••" required autocomplete="new-password">
-    </div>
-
-    <div class="form-group">
-      <label for="confirm-password">تأكيد كلمة المرور</label>
-      <input type="password" id="confirm-password" placeholder="••••••••" required autocomplete="new-password">
-    </div>
-
-    <!-- Honeypot hidden input -->
-    <div style="position:absolute; left:-9999px; top:auto; width:1px; height:1px; overflow:hidden;">
-      <label for="website">Website (leave blank)</label>
-      <input type="text" id="website" name="website" autocomplete="off" tabindex="-1" />
-    </div>
-
-    <!-- Hidden fields -->
-    <input type="hidden" id="recaptchaToken" name="recaptcha_token" />
-
-    <!-- Optional: try to request that FormSubmit uses the submitter as reply-to (helps replies to go to the user).
-         This doesn't guarantee FormSubmit will send an autoresponse to the user — see notes below. -->
-    <input type="hidden" name="_replyto" id="_replyto" value="">
-
-    <button type="submit" class="signup-btn">تسجيل</button>
-    <p class="login-link">لديك حساب بالفعل؟ <a href="login.html">تسجيل الدخول</a></p>
-  </form>
-</div>
-
-<div id="cg-toast" role="status" aria-live="polite"></div>
-
-<script>
-(async function(){
-  const FORM_EMAIL = 'yacob13579@gmail.com'; // <<< REPLACE this with the email you registered at FormSubmit
-  const AJAX_ENDPOINT = `https://formsubmit.co/ajax/${encodeURIComponent(FORM_EMAIL)}`;
-
-  const form = document.getElementById('signupForm');
-  const toast = document.getElementById('cg-toast');
-  const submitBtn = form.querySelector('.signup-btn');
-
-  function showToast(msg, ms = 2600) {
-    toast.textContent = msg;
-    toast.style.opacity = '1';
-    setTimeout(() => { toast.style.opacity = '0'; }, ms);
-  }
-
-  function bufferToHex(buffer) {
-    const bytes = new Uint8Array(buffer);
-    return Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join('');
-  }
-
-  function emailValid(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
-
-  function setSubmitting(state) {
-    submitBtn.disabled = state;
-    submitBtn.style.opacity = state ? '0.7' : '1';
-    if (state) {
-      submitBtn.dataset.origText = submitBtn.textContent;
-      submitBtn.textContent = 'جارٍ الإرسال...';
-    } else {
-      submitBtn.textContent = submitBtn.dataset.origText || submitBtn.textContent;
-    }
-  }
-
-  window.onSubmitPrepare = async function(e) {
-    e.preventDefault();
-
-    const username = document.getElementById('username').value.trim();
-    const email = document.getElementById('email').value.trim();
-    const passwordEl = document.getElementById('password');
-    const confirmEl = document.getElementById('confirm-password');
-    const password = passwordEl.value || '';
-    const confirm = confirmEl.value || '';
-    const honeypot = document.getElementById('website').value;
-
-    if (honeypot) { showToast('Spam detected.'); return false; }
-    if (!username || username.length < 2) { showToast('Please enter a valid username.'); document.getElementById('username').focus(); return false; }
-    if (!email || !emailValid(email)) { showToast('Please enter a valid email.'); document.getElementById('email').focus(); return false; }
-    if (!password || password.length < 6) { showToast('Password must be at least 6 characters.'); passwordEl.focus(); return false; }
-    if (password !== confirm) { showToast('Passwords do not match.'); confirmEl.focus(); return false; }
-
-    setSubmitting(true);
-
-    // Hash password (optional)
-    try {
-      const enc = new TextEncoder().encode(password);
-      const digest = await crypto.subtle.digest('SHA-256', enc);
-      const hexHash = bufferToHex(digest);
-      passwordEl.value = hexHash;
-      confirmEl.value = '';
-    } catch (err) {
-      console.warn('Hashing failed, will send plain password (not recommended).', err);
-    }
-
-    // reCAPTCHA v3 token (if you want)
-    if (window.grecaptcha && grecaptcha.execute) {
-      try {
-        const token = await new Promise((resolve, reject) => {
-          grecaptcha.ready(() => {
-            grecaptcha.execute('6LdxBKErAAAAAFVlC71oXUICVYSgzNeDFEyxQ7fJ', { action: 'signup' })
-              .then(resolve).catch(reject);
-          });
-        });
-        document.getElementById('recaptchaToken').value = token;
-      } catch (rcErr) {
-        console.warn('reCAPTCHA failed:', rcErr);
-        // allow submission to proceed if you prefer; remove the following line if you don't want to block on recaptcha
-        // setSubmitting(false); showToast('reCAPTCHA failed.'); return false;
-      }
-    }
-
-    // Build FormData for AJAX send
-    const fd = new FormData(form);
-    // Set _replyto to the user's email so replies go to them (helps with reply headers).
-    const replyInput = document.getElementById('_replyto');
-    if (replyInput) replyInput.value = email;
-
-    // IMPORTANT: submit via FormSubmit AJAX endpoint so the user stays on your page
-    try {
-      const res = await fetch(AJAX_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Accept': 'application/json' },
-        body: fd
-      });
-
-      // FormSubmit's AJAX returns JSON when Accept: application/json
-      if (!res.ok) {
-        const text = await res.text().catch(()=>null);
-        console.error('FormSubmit returned non-OK:', res.status, text);
-        showToast('فشل الإرسال — حاول مرة أخرى.');
-        setSubmitting(false);
-        return false;
-      }
-
-      const json = await res.json().catch(()=>null);
-      console.log('FormSubmit response:', json);
-
-      // --- At this point the submission succeeded to FormSubmit ---
-      // Redirect user to login.html
-      showToast('تم إنشاء الحساب — سيتم إعادة التوجيه...', 1200);
-      setTimeout(()=> {
-        window.location.href = window.location.origin + '/login.html';
-      }, 900);
-
-      // OPTIONAL: you can perform other client-side actions here (local storage, analytics, etc.)
-      return false;
-
-    } catch (err) {
-      console.error('AJAX submission failed:', err);
-      showToast('فشل الاتصال — تحقق من اتصالك وحاول مرة أخرى.');
-      setSubmitting(false);
-      return false;
-    }
-  };
-})();
-</script>
-
-</body>
-</html>
-<!doctype html>
-<html lang="ar" dir="rtl">
-<head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>إنشاء حساب</title>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <script src="https://www.google.com/recaptcha/api.js?render=6LdxBKErAAAAAFVlC71oXUICVYSgzNeDFEyxQ7fJ"></script>
+  <script src="https://www.google.com/recaptcha/api.js?render=6LdxBKErAAAAAFVlC71oXUICVYSgzNeDFEyxQ7fJ" async></script>
+
   <style>
-    *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:'Nunito',sans-serif;background:linear-gradient(135deg,#0a1b2a 0%,#112f4a 100%);color:#e0e6f0;min-height:100vh;display:flex;justify-content:center;align-items:center;padding:1.5rem}
-    .card{background:rgba(20,45,75,0.95);padding:2rem 2.5rem;border-radius:15px;box-shadow:0 0 25px rgba(255,59,59,0.4),inset 0 0 10px rgba(255,59,59,0.2);width:100%;max-width:480px;text-align:center}
-    h1{color:#ff3b3b;font-size:2rem;font-weight:800;text-shadow:0 0 8px #ff3b3b;margin-bottom:.5rem}
-    .subtitle{font-size:1rem;color:#d1d9efcc;margin-bottom:1.5rem}
-    .form-group{margin-bottom:1.2rem;text-align:right}
-    label{display:block;margin-bottom:.4rem;font-weight:700;color:#ffdede}
-    input[type="text"],input[type="email"],input[type="password"]{width:100%;padding:.6rem .8rem;border-radius:8px;border:none;background:rgba(255,255,255,0.08);color:#fff;font-size:1rem;outline:none;box-shadow:inset 0 0 5px rgba(255,59,59,0.4);transition:box-shadow .3s,background .3s}
-    input:focus{background:rgba(255,255,255,0.12);box-shadow:0 0 8px #ff3b3b,inset 0 0 8px #ff3b3b}
-    .btn{width:100%;padding:.75rem;font-size:1.05rem;font-weight:800;background:#ff3b3b;color:#fff;border:none;border-radius:8px;cursor:pointer;box-shadow:0 0 15px #ff3b3baa;transition:background .3s,box-shadow .3s}
-    .btn[disabled]{opacity:.7;cursor:not-allowed}
-    .btn:hover{background:#ff6666;box-shadow:0 0 25px #ff6666bb}
-    .small{font-size:.95rem;color:#d1d9efcc;margin-top:1rem}
-    #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:20px;background:#222;color:#fff;padding:.6rem .9rem;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.5);opacity:0;transition:opacity .2s;z-index:99999;pointer-events:none}
-    @media (max-width:480px){.card{padding:1.3rem}}
+    /* Prevent horizontal scroll and duplicated-page look */
+    html,body { overflow-x: hidden; height: 100%; }
+
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      font-family: 'Nunito', sans-serif;
+      background: linear-gradient(135deg,#0a1b2a 0%,#112f4a 100%);
+      color:#e0e6f0;
+      min-height:100vh;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      padding:1.5rem;
+    }
+
+    .card{
+      background: rgba(20,45,75,0.95);
+      padding:2rem 2.5rem;
+      border-radius:15px;
+      box-shadow:0 0 25px rgba(255,59,59,0.4), inset 0 0 10px rgba(255,59,59,0.2);
+      width:100%;
+      max-width:480px;
+      text-align:center;
+      overflow:hidden;
+    }
+
+    h1{ color:#ff3b3b; font-size:2rem; font-weight:800; text-shadow:0 0 8px #ff3b3b; margin-bottom:.5rem }
+    .subtitle{ font-size:1rem; color:#d1d9efcc; margin-bottom:1.5rem }
+    .form-group{ margin-bottom:1.2rem; text-align:right }
+    label{ display:block; margin-bottom:.4rem; font-weight:700; color:#ffdede }
+    input[type="text"], input[type="email"], input[type="password"]{
+      width:100%;
+      padding:.6rem .8rem;
+      border-radius:8px;
+      border:none;
+      background:rgba(255,255,255,0.08);
+      color:#fff;
+      font-size:1rem;
+      outline:none;
+      box-shadow:inset 0 0 5px rgba(255,59,59,0.4);
+      transition:box-shadow .25s, background .25s;
+    }
+    input:focus{ background:rgba(255,255,255,0.12); box-shadow:0 0 8px #ff3b3b, inset 0 0 8px #ff3b3b; }
+
+    .btn{
+      width:100%;
+      padding:.75rem;
+      font-size:1.05rem;
+      font-weight:800;
+      background:#ff3b3b;
+      color:#fff;
+      border:none;
+      border-radius:8px;
+      cursor:pointer;
+      box-shadow:0 0 15px #ff3b3baa;
+      transition:background .3s, box-shadow .3s;
+    }
+    .btn[disabled]{ opacity:.7; cursor:not-allowed; }
+    .btn:hover{ background:#ff6666; box-shadow:0 0 25px #ff6666bb; }
+
+    .small{ font-size:.95rem; color:#d1d9efcc; margin-top:1rem }
+    #toast{ position:fixed; left:50%; transform:translateX(-50%); bottom:20px; background:#222; color:#fff; padding:.6rem .9rem; border-radius:8px; box-shadow:0 6px 18px rgba(0,0,0,.5); opacity:0; transition:opacity .2s; z-index:99999; pointer-events:none; }
+    @media (max-width:480px){ .card{ padding:1.3rem } }
   </style>
 </head>
 <body>
-  <div class="card" role="main" aria-labelledby="signupTitle">
+  <main class="card" role="main" aria-labelledby="signupTitle">
     <h1 id="signupTitle">إنشاء حساب جديد</h1>
     <p class="subtitle">انضم إلينا الآن وابدأ رحلتك</p>
 
-    <!-- NOTE: replace your@email.com below with the email you registered at FormSubmit -->
-    <form id="signupForm" action="javascript:void(0)" method="POST" autocomplete="on">
+    <!-- SINGLE SIGNUP FORM -->
+    <form id="signupForm" action="javascript:void(0)" method="POST" autocomplete="on" novalidate>
       <div class="form-group">
         <label for="username">اسم المستخدم</label>
-        <input id="username" name="username" type="text" placeholder="أدخل اسم المستخدم" required autocomplete="username">
+        <input id="username" name="username" type="text" placeholder="أدخل اسم المستخدم" required autocomplete="username" />
       </div>
 
       <div class="form-group">
         <label for="email">البريد الإلكتروني</label>
-        <input id="email" name="email" type="email" placeholder="example@email.com" required autocomplete="email">
+        <input id="email" name="email" type="email" placeholder="example@email.com" required autocomplete="email" />
       </div>
 
       <div class="form-group">
         <label for="password">كلمة المرور</label>
-        <input id="password" name="password" type="password" placeholder="••••••••" required autocomplete="new-password">
+        <input id="password" name="password" type="password" placeholder="••••••••" required autocomplete="new-password" />
       </div>
 
       <div class="form-group">
         <label for="confirm">تأكيد كلمة المرور</label>
-        <input id="confirm" name="confirm" type="password" placeholder="••••••••" required autocomplete="new-password">
+        <input id="confirm" name="confirm" type="password" placeholder="••••••••" required autocomplete="new-password" />
       </div>
 
-      <!-- hidden honeypot -->
-      <div style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden">
+      <!-- honeypot (hidden) -->
+      <div style="position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden;">
         <label for="website">Website (leave blank)</label>
-        <input id="website" name="website" type="text" tabindex="-1" autocomplete="off">
+        <input id="website" name="website" type="text" tabindex="-1" autocomplete="off" />
       </div>
 
-      <input type="hidden" id="recaptchaToken" name="recaptcha_token">
-      <button class="btn" type="submit" id="submitBtn">تسجيل</button>
+      <!-- Recaptcha token + replyto helper -->
+      <input type="hidden" id="recaptchaToken" name="recaptcha_token" />
+      <input type="hidden" id="_replyto" name="_replyto" value="" />
 
-      <p class="small">لديك حساب بالفعل؟ <a style="color:#ff3b3b;font-weight:700;text-decoration:none" href="login.html">تسجيل الدخول</a></p>
+      <button class="btn" id="submitBtn" type="submit">تسجيل</button>
+
+      <p class="small">لديك حساب بالفعل؟ <a href="login.html" style="color:#ff3b3b;font-weight:700;text-decoration:none">تسجيل الدخول</a></p>
     </form>
-  </div>
+  </main>
 
   <div id="toast" role="status" aria-live="polite"></div>
 
-<script>
-(function(){
-  // CONFIG: change this to your FormSubmit email
-  const FORM_EMAIL = 'yacob13579@gmail.com';
-  const AJAX_ENDPOINT = `https://formsubmit.co/ajax/${encodeURIComponent(FORM_EMAIL)}`;
+  <script>
+  (function(){
+    // CONFIG
+    const FORM_EMAIL = 'yacob13579@gmail.com'; // you already set this
+    const AJAX_ENDPOINT = `https://formsubmit.co/ajax/${encodeURIComponent(FORM_EMAIL)}`;
 
-  const form = document.getElementById('signupForm');
-  const toast = document.getElementById('toast');
-  const submitBtn = document.getElementById('submitBtn');
+    const form = document.getElementById('signupForm');
+    const toast = document.getElementById('toast');
+    const submitBtn = document.getElementById('submitBtn');
 
-  function showToast(msg, ms = 2600){
-    toast.textContent = msg;
-    toast.style.opacity = '1';
-    setTimeout(()=>{ toast.style.opacity = '0'; }, ms);
-  }
-
-  function hexFromBuffer(buf){
-    return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
-  }
-
-  function validEmail(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
-
-  function setSubmitting(s){
-    submitBtn.disabled = s;
-    if (s){ submitBtn.dataset.txt = submitBtn.textContent; submitBtn.textContent = 'جارٍ الإرسال...'; }
-    else submitBtn.textContent = submitBtn.dataset.txt || submitBtn.textContent;
-  }
-
-  form.addEventListener('submit', async (ev)=>{
-    ev.preventDefault();
-    const username = document.getElementById('username').value.trim();
-    const email = document.getElementById('email').value.trim().toLowerCase();
-    const pwd = document.getElementById('password').value || '';
-    const confirm = document.getElementById('confirm').value || '';
-    const honeypot = document.getElementById('website').value;
-
-    if (honeypot) { showToast('Spam detected'); return; }
-    if (!username || username.length < 2){ showToast('اسم مستخدم غير صالح'); return; }
-    if (!email || !validEmail(email)){ showToast('أدخل بريدًا إلكترونيًا صالحًا'); return; }
-    if (!pwd || pwd.length < 6){ showToast('يجب أن تكون كلمة المرور 6 أحرف على الأقل'); return; }
-    if (pwd !== confirm){ showToast('كلمتا المرور غير متطابقتين'); return; }
-
-    // check localStorage for duplicates
-    const raw = localStorage.getItem('registeredUsers') || '[]';
-    const list = JSON.parse(raw);
-    if (list.find(u=>u.email === email)){
-      showToast('هذا البريد مسجّل بالفعل. حاول تسجيل الدخول.');
-      return;
+    function showToast(msg, ms = 2600) {
+      toast.textContent = msg;
+      toast.style.opacity = '1';
+      setTimeout(()=> toast.style.opacity = '0', ms);
     }
 
-    setSubmitting(true);
-
-    // hash password client-side
-    let pwHash = '';
-    try {
-      const enc = new TextEncoder().encode(pwd);
-      const digest = await crypto.subtle.digest('SHA-256', enc);
-      pwHash = hexFromBuffer(digest);
-    } catch(e){
-      console.warn('hash failed', e);
-      // fallback (not ideal)
-      pwHash = btoa(pwd);
+    function hexFromBuffer(buf) {
+      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
     }
 
-    // Build FormData and send to FormSubmit AJAX endpoint so user stays on the page
-    const fd = new FormData();
-    fd.append('username', username);
-    fd.append('email', email);
-    // we send the hash so owner receives hashed password instead of plain
-    fd.append('password', pwHash);
-    fd.append('_subject', 'New signup (demo)');
-    // reply-to so owner can reply to user easily
-    fd.append('_replyto', email);
+    function validEmail(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
 
-    // try recaptcha (non-blocking)
-    if (window.grecaptcha && grecaptcha.execute){
-      try {
-        const token = await new Promise((res, rej)=>{
-          grecaptcha.ready(()=> grecaptcha.execute('6LdxBKErAAAAAFVlC71oXUICVYSgzNeDFEyxQ7fJ',{action:'signup'}).then(res).catch(rej));
-        });
-        fd.append('recaptcha_token', token);
-      } catch(err){
-        console.warn('recaptcha failed', err);
+    function setSubmitting(state) {
+      submitBtn.disabled = state;
+      if (state) {
+        submitBtn.dataset.orig = submitBtn.textContent;
+        submitBtn.textContent = 'جارٍ الإرسال...';
+      } else {
+        submitBtn.textContent = submitBtn.dataset.orig || submitBtn.textContent;
       }
     }
 
-    try {
-      const resp = await fetch(AJAX_ENDPOINT, { method:'POST', headers:{ Accept:'application/json' }, body: fd });
-      if (!resp.ok) throw new Error('Network response not ok');
-      const json = await resp.json().catch(()=>null);
-      console.log('FormSubmit result', json);
+    form.addEventListener('submit', async function(ev){
+      ev.preventDefault();
 
-      // Save the new user to localStorage (demo only)
-      list.push({ email, username, passwordHash: pwHash });
-      localStorage.setItem('registeredUsers', JSON.stringify(list));
+      const username = document.getElementById('username').value.trim();
+      const email = document.getElementById('email').value.trim().toLowerCase();
+      const password = document.getElementById('password').value || '';
+      const confirm = document.getElementById('confirm').value || '';
+      const honeypot = document.getElementById('website').value;
 
-      showToast('تم إنشاء الحساب — إعادة التوجيه إلى صفحة تسجيل الدخول...', 1400);
-      setTimeout(()=> location.href = window.location.origin + '/login.html', 900);
+      if (honeypot) { showToast('Spam detected.'); return; }
+      if (!username || username.length < 2) { showToast('اسم مستخدم غير صالح'); return; }
+      if (!email || !validEmail(email)) { showToast('أدخل بريدًا إلكترونيًا صالحًا'); return; }
+      if (!password || password.length < 6) { showToast('يجب أن تكون كلمة المرور 6 أحرف على الأقل'); return; }
+      if (password !== confirm) { showToast('كلمتا المرور غير متطابقتين'); return; }
 
-    } catch(err){
-      console.error(err);
-      showToast('فشل الإرسال. حاول مرة أخرى.');
-      setSubmitting(false);
-    }
-  });
-})();
-</script>
+      // prevent duplicates in demo localStorage
+      const raw = localStorage.getItem('registeredUsers') || '[]';
+      const users = JSON.parse(raw);
+      if (users.find(u => u.email === email)) {
+        showToast('هذا البريد مسجّل بالفعل. حاول تسجيل الدخول.');
+        return;
+      }
+
+      setSubmitting(true);
+
+      // hash password client-side (SHA-256)
+      let pwHash = '';
+      try {
+        const enc = new TextEncoder().encode(password);
+        const digest = await crypto.subtle.digest('SHA-256', enc);
+        pwHash = hexFromBuffer(digest);
+      } catch(err) {
+        console.warn('hash failed', err);
+        pwHash = btoa(password); // fallback for demo ONLY
+      }
+
+      // Build FormData for FormSubmit AJAX endpoint
+      const fd = new FormData();
+      fd.append('username', username);
+      fd.append('email', email);
+      fd.append('password', pwHash); // owner receives hash, not plain password
+      fd.append('_subject', 'New signup (demo)');
+      fd.append('_replyto', email);
+
+      // Attempt reCAPTCHA (non-blocking)
+      if (window.grecaptcha && grecaptcha.execute) {
+        try {
+          const token = await new Promise((res, rej) => {
+            grecaptcha.ready(() => {
+              grecaptcha.execute('6LdxBKErAAAAAFVlC71oXUICVYSgzNeDFEyxQ7fJ', { action: 'signup' })
+                .then(res).catch(rej);
+            });
+          });
+          fd.append('recaptcha_token', token);
+        } catch(rcErr) {
+          console.warn('reCAPTCHA failed', rcErr);
+        }
+      }
+
+      // Send via AJAX so user stays on page
+      try {
+        const res = await fetch(AJAX_ENDPOINT, {
+          method: 'POST',
+          headers: { Accept: 'application/json' },
+          body: fd
+        });
+
+        if (!res.ok) {
+          const text = await res.text().catch(()=>null);
+          console.error('FormSubmit returned non-OK:', res.status, text);
+          showToast('فشل الإرسال — حاول مرة أخرى.');
+          setSubmitting(false);
+          return;
+        }
+
+        // Save user locally for demo login
+        users.push({ email, username, passwordHash: pwHash });
+        localStorage.setItem('registeredUsers', JSON.stringify(users));
+
+        showToast('تم إنشاء الحساب — إعادة التوجيه إلى صفحة تسجيل الدخول...', 1300);
+        setTimeout(()=> { window.location.href = window.location.origin + '/login.html'; }, 900);
+
+      } catch(err) {
+        console.error('AJAX submit failed', err);
+        showToast('فشل الاتصال — تحقق من اتصالك وحاول مرة أخرى.');
+        setSubmitting(false);
+      }
+    });
+  })();
+  </script>
 </body>
 </html>
